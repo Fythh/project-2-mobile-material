@@ -179,7 +179,7 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Material Nyawit',
+                  'MaterialKu',
                   style: AppTextStyle.heading3.copyWith(
                     color: Colors.white,
                     fontSize: 20,

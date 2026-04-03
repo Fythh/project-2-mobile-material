@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../models/material_model.dart';
+import 'material_detail_page.dart';  // ← IMPORT DETAIL PAGE
 
 class MaterialListPage extends StatefulWidget {
   const MaterialListPage({super.key});
@@ -292,6 +293,15 @@ class _MaterialListPageState extends State<MaterialListPage> {
         borderRadius: AppBorderRadius.md,
         child: InkWell(
           borderRadius: AppBorderRadius.md,
+          onTap: () {
+            // ← INI YANG DITAMBAHIN
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MaterialDetailPage(material: material),
+              ),
+            );
+          },
           onLongPress: () => _showEditBottomSheet(material),
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.md),

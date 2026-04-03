@@ -22,8 +22,9 @@ class ProfilePage extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              'Material Nyawit',
+              'MaterialKu',
               style: AppTextStyle.heading2,
+              
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
