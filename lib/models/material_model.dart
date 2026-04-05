@@ -6,6 +6,7 @@ class MaterialModel {
   final int stock;
   final String description;
   final double? rating;
+  final String? imageUrl;  // ← TAMBAHKAN INI
 
   MaterialModel({
     this.id,
@@ -15,6 +16,7 @@ class MaterialModel {
     required this.stock,
     required this.description,
     this.rating,
+    this.imageUrl,  // ← TAMBAHKAN INI
   });
 
   // ============ CONVERT FROM JSON (buat nerima data dari API) ============
@@ -27,6 +29,7 @@ class MaterialModel {
       stock: json['stock'] ?? 0,
       description: json['description'] ?? '',
       rating: json['rating']?.toDouble() ?? 0.0,
+      imageUrl: json['image_url'],  // ← TAMBAHKAN INI
     );
   }
 
@@ -38,6 +41,8 @@ class MaterialModel {
       'price': price,
       'stock': stock,
       'description': description,
+      'rating': rating ?? 0,
+      'image_url': imageUrl,  // ← TAMBAHKAN INI
     };
   }
 
@@ -50,6 +55,7 @@ class MaterialModel {
     int? stock,
     String? description,
     double? rating,
+    String? imageUrl,  // ← TAMBAHKAN INI
   }) {
     return MaterialModel(
       id: id ?? this.id,
@@ -59,6 +65,7 @@ class MaterialModel {
       stock: stock ?? this.stock,
       description: description ?? this.description,
       rating: rating ?? this.rating,
+      imageUrl: imageUrl ?? this.imageUrl,  // ← TAMBAHKAN INI
     );
   }
 }

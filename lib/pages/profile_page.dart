@@ -1,11 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
+  Future<void> _logout(BuildContext context) async {
+    await Supabase.instance.client.auth.signOut();
+    if (context.mounted) {
+      Navigator.pushReplacementNamed(context, '/');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = Supabase.instance.client.auth.currentUser;
+    final email = user?.email ?? 'Tidak diketahui';
+
     return Scaffold(
       body: Center(
         child: Column(
@@ -15,7 +26,7 @@ class ProfilePage extends StatelessWidget {
               radius: 50,
               backgroundColor: AppColors.primary.withOpacity(0.1),
               child: Icon(
-                Icons.store,
+                Icons.person,
                 size: 50,
                 color: AppColors.primary,
               ),
@@ -24,13 +35,27 @@ class ProfilePage extends StatelessWidget {
             Text(
               'MaterialKu',
               style: AppTextStyle.heading2,
-              
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Aplikasi Manajemen Material Bangunan',
+              'Construction Materials Management Application',
               style: AppTextStyle.bodyMedium.copyWith(
                 color: AppColors.gray500,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: AppBorderRadius.md,
+              ),
+              child: Text(
+                email,
+                style: AppTextStyle.bodyMedium.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -47,7 +72,7 @@ class ProfilePage extends StatelessWidget {
                     leading: const Icon(Icons.person),
                     title: const Text('Developer'),
                     subtitle: Text(
-                      'Mahatir Ajalah',
+                      'Group 10',
                       style: AppTextStyle.bodySmall,
                     ),
                   ),
@@ -64,6 +89,22 @@ class ProfilePage extends StatelessWidget {
                     subtitle: const Text('1.0.0'),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            SizedBox(
+              width: 200,
+              height: 45,
+              child: OutlinedButton(
+                onPressed: () => _logout(context),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.danger),
+                  shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.md),
+                ),
+                child: Text(
+                  'Logout',
+                  style: TextStyle(color: AppColors.danger),
+                ),
               ),
             ),
           ],

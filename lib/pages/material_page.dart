@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../models/material_model.dart';
-import 'material_detail_page.dart';  // ← IMPORT DETAIL PAGE
+import 'material_detail_page.dart';
 
 class MaterialListPage extends StatefulWidget {
   const MaterialListPage({super.key});
@@ -52,7 +54,6 @@ class _MaterialListPageState extends State<MaterialListPage> {
     }).toList();
   }
 
-  // ============ CREATE ============
   Future<void> _showAddBottomSheet() async {
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -61,9 +62,9 @@ class _MaterialListPageState extends State<MaterialListPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => MaterialFormBottomSheet(
-        onSave: (material) async {
+        onSave: (material, imageFile) async {
           try {
-            await _apiService.createMaterial(material);
+            await _apiService.createMaterial(material, imageFile: imageFile);
             await _loadData();
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -92,7 +93,6 @@ class _MaterialListPageState extends State<MaterialListPage> {
     }
   }
 
-  // ============ UPDATE ============
   Future<void> _showEditBottomSheet(MaterialModel material) async {
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -103,9 +103,9 @@ class _MaterialListPageState extends State<MaterialListPage> {
       builder: (context) => MaterialFormBottomSheet(
         material: material,
         isEdit: true,
-        onSave: (updatedMaterial) async {
+        onSave: (updatedMaterial, imageFile) async {
           try {
-            await _apiService.updateMaterial(material.id!, updatedMaterial);
+            await _apiService.updateMaterial(material.id!, updatedMaterial, imageFile: imageFile);
             await _loadData();
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -134,7 +134,6 @@ class _MaterialListPageState extends State<MaterialListPage> {
     }
   }
 
-  // ============ DELETE ============
   Future<void> _confirmDelete(MaterialModel material) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -160,7 +159,7 @@ class _MaterialListPageState extends State<MaterialListPage> {
 
     if (confirmed == true) {
       try {
-        await _apiService.deleteMaterial(material.id!);
+        await _apiService.deleteMaterial(material.id!, imageUrl: material.imageUrl);
         await _loadData();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -188,7 +187,6 @@ class _MaterialListPageState extends State<MaterialListPage> {
     return Scaffold(
       body: Column(
         children: [
-          // Search Bar
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Container(
@@ -204,9 +202,7 @@ class _MaterialListPageState extends State<MaterialListPage> {
                 },
                 decoration: InputDecoration(
                   hintText: 'Cari material...',
-                  hintStyle: AppTextStyle.bodyMedium.copyWith(
-                    color: AppColors.gray400,
-                  ),
+                  hintStyle: AppTextStyle.bodyMedium.copyWith(color: AppColors.gray400),
                   prefixIcon: const Icon(Icons.search, color: AppColors.gray400),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.all(AppSpacing.md),
@@ -214,8 +210,6 @@ class _MaterialListPageState extends State<MaterialListPage> {
               ),
             ),
           ),
-
-          // Content
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -224,37 +218,12 @@ class _MaterialListPageState extends State<MaterialListPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.inbox,
-                              size: 64,
-                              color: AppColors.gray300,
-                            ),
+                            Icon(Icons.inbox, size: 64, color: AppColors.gray300),
                             const SizedBox(height: AppSpacing.md),
                             Text(
-                              _searchQuery.isEmpty
-                                  ? 'Belum ada material'
-                                  : 'Tidak ada material yang cocok',
-                              style: AppTextStyle.bodyMedium.copyWith(
-                                color: AppColors.gray400,
-                              ),
+                              _searchQuery.isEmpty ? 'Belum ada material' : 'Tidak ada material yang cocok',
+                              style: AppTextStyle.bodyMedium.copyWith(color: AppColors.gray400),
                             ),
-                            if (_searchQuery.isNotEmpty)
-                              TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _searchQuery = '';
-                                  });
-                                },
-                                child: const Text('Hapus filter'),
-                              ),
-                            if (_materials.isEmpty)
-                              const SizedBox(height: AppSpacing.md),
-                            if (_materials.isEmpty)
-                              ElevatedButton.icon(
-                                onPressed: _showAddBottomSheet,
-                                icon: const Icon(Icons.add),
-                                label: const Text('Tambah Material'),
-                              ),
                           ],
                         ),
                       )
@@ -294,11 +263,13 @@ class _MaterialListPageState extends State<MaterialListPage> {
         child: InkWell(
           borderRadius: AppBorderRadius.md,
           onTap: () {
-            // ← INI YANG DITAMBAHIN
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => MaterialDetailPage(material: material),
+                builder: (context) => MaterialDetailPage(
+                  material: material,
+                  onMaterialUpdated: _loadData,
+                ),
               ),
             );
           },
@@ -307,32 +278,52 @@ class _MaterialListPageState extends State<MaterialListPage> {
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Row(
               children: [
-                // Icon kategori
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: AppBorderRadius.md,
-                  ),
-                  child: Icon(
-                    _getCategoryIcon(material.category),
-                    color: AppColors.primary,
-                    size: 28,
-                  ),
+                ClipRRect(
+                  borderRadius: AppBorderRadius.md,
+                  child: material.imageUrl != null && material.imageUrl!.isNotEmpty
+                      ? Image.network(
+                          material.imageUrl!,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: AppBorderRadius.md,
+                              ),
+                              child: Icon(
+                                _getCategoryIcon(material.category),
+                                color: AppColors.primary,
+                                size: 28,
+                              ),
+                            );
+                          },
+                        )
+                      : Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: AppBorderRadius.md,
+                          ),
+                          child: Icon(
+                            _getCategoryIcon(material.category),
+                            color: AppColors.primary,
+                            size: 28,
+                          ),
+                        ),
                 ),
                 const SizedBox(width: AppSpacing.md),
-                
-                // Info utama
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         material.name,
-                        style: AppTextStyle.bodyMedium.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: AppTextStyle.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -340,39 +331,24 @@ class _MaterialListPageState extends State<MaterialListPage> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm,
-                              vertical: 4,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppColors.gray100,
                               borderRadius: AppBorderRadius.sm,
                             ),
-                            child: Text(
-                              material.category,
-                              style: AppTextStyle.caption,
-                            ),
+                            child: Text(material.category, style: AppTextStyle.caption),
                           ),
                           const SizedBox(width: AppSpacing.sm),
-                          if ((material.rating ?? 0) > 0)
-                            Row(
-                              children: [
-                                const Icon(Icons.star,
-                                    size: 12, color: Colors.amber),
-                                const SizedBox(width: 2),
-                                Text(
-                                  material.rating!.toStringAsFixed(1),
-                                  style: AppTextStyle.caption,
-                                ),
-                              ],
-                            ),
-                          const SizedBox(width: AppSpacing.sm),
+                          Icon(
+                            Icons.inventory_2_outlined,
+                            size: 12,
+                            color: material.stock < 10 ? AppColors.danger : AppColors.gray500,
+                          ),
+                          const SizedBox(width: 2),
                           Text(
-                            'Stok: ${material.stock} ${_getUnit(material.category)}',
+                            'Stok: ${material.stock}',
                             style: AppTextStyle.caption.copyWith(
-                              color: material.stock < 10
-                                  ? AppColors.danger
-                                  : AppColors.gray500,
+                              color: material.stock < 10 ? AppColors.danger : AppColors.gray500,
                             ),
                           ),
                         ],
@@ -380,36 +356,15 @@ class _MaterialListPageState extends State<MaterialListPage> {
                     ],
                   ),
                 ),
-                
-                // Harga dan aksi
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Rp ${_formatNumber(material.price)}',
-                      style: AppTextStyle.bodyMedium.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 20),
-                          color: AppColors.warning,
-                          onPressed: () => _showEditBottomSheet(material),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, size: 20),
-                          color: AppColors.danger,
-                          onPressed: () => _confirmDelete(material),
-                        ),
-                      ],
-                    ),
-                  ],
+                Text(
+                  'Rp ${_formatNumber(material.price)}',
+                  style: AppTextStyle.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
                 ),
+                const SizedBox(width: AppSpacing.sm),
+                Icon(Icons.chevron_right, size: 20, color: AppColors.gray400),
               ],
             ),
           ),
@@ -418,7 +373,6 @@ class _MaterialListPageState extends State<MaterialListPage> {
     );
   }
 
-  // Helper: Format angka
   String _formatNumber(int number) {
     return number.toString().replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
@@ -426,41 +380,14 @@ class _MaterialListPageState extends State<MaterialListPage> {
     );
   }
 
-  // Helper: Dapatkan icon berdasarkan kategori
   IconData _getCategoryIcon(String category) {
     switch (category.toLowerCase()) {
-      case 'bata':
-      case 'batu bata':
-        return Icons.cabin_rounded;
-      case 'besi':
-      case 'baja':
-        return Icons.hardware_rounded;
-      case 'cat':
-        return Icons.format_paint_rounded;
-      case 'kayu':
-        return Icons.forest_rounded;
-      case 'semen':
-        return Icons.construction_rounded;
-      default:
-        return Icons.category_rounded;
-    }
-  }
-
-  String _getUnit(String category) {
-    switch (category.toLowerCase()) {
-      case 'bata':
-        return 'pcs';
-      case 'besi':
-      case 'baja':
-        return 'btg';
-      case 'cat':
-        return 'kg';
-      case 'kayu':
-        return 'lbr';
-      case 'semen':
-        return 'sak';
-      default:
-        return 'unit';
+      case 'bata': return Icons.cabin_rounded;
+      case 'besi': return Icons.hardware_rounded;
+      case 'cat': return Icons.format_paint_rounded;
+      case 'kayu': return Icons.forest_rounded;
+      case 'semen': return Icons.construction_rounded;
+      default: return Icons.category_rounded;
     }
   }
 }
@@ -469,7 +396,7 @@ class _MaterialListPageState extends State<MaterialListPage> {
 class MaterialFormBottomSheet extends StatefulWidget {
   final MaterialModel? material;
   final bool isEdit;
-  final Function(MaterialModel) onSave;
+  final Function(MaterialModel, File?) onSave;
 
   const MaterialFormBottomSheet({
     super.key,
@@ -490,6 +417,7 @@ class _MaterialFormBottomSheetState extends State<MaterialFormBottomSheet> {
   late TextEditingController _stockController;
   late TextEditingController _descriptionController;
   late TextEditingController _ratingController;
+  File? _selectedImage;
   bool _isLoading = false;
 
   final List<String> _categoryOptions = [
@@ -526,6 +454,17 @@ class _MaterialFormBottomSheetState extends State<MaterialFormBottomSheet> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+      });
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -541,9 +480,11 @@ class _MaterialFormBottomSheetState extends State<MaterialFormBottomSheet> {
       rating: _ratingController.text.trim().isEmpty
           ? null
           : double.parse(_ratingController.text.trim()),
+      imageUrl: widget.material?.imageUrl,
     );
 
-    await widget.onSave(material);
+    final imageToSend = (!widget.isEdit && _selectedImage != null) ? _selectedImage : null;
+    await widget.onSave(material, imageToSend);
     
     if (mounted) {
       Navigator.pop(context, true);
@@ -559,170 +500,205 @@ class _MaterialFormBottomSheetState extends State<MaterialFormBottomSheet> {
         right: AppSpacing.lg,
         top: AppSpacing.lg,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.gray300,
-                borderRadius: AppBorderRadius.sm,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.gray300,
+                  borderRadius: AppBorderRadius.sm,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            widget.isEdit ? '✏️ Edit Material' : '➕ Tambah Material',
-            style: AppTextStyle.heading3,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nama Material',
-                    prefixIcon: Icon(Icons.label),
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Nama material wajib diisi';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  value: _categoryController.text,
-                  decoration: const InputDecoration(
-                    labelText: 'Kategori',
-                    prefixIcon: Icon(Icons.category),
-                    border: OutlineInputBorder(),
-                  ),
-                  items: _categoryOptions.map((category) {
-                    return DropdownMenuItem(
-                      value: category,
-                      child: Text(category),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _categoryController.text = value!;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Kategori wajib dipilih';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _priceController,
-                        decoration: const InputDecoration(
-                          labelText: 'Harga',
-                          prefixIcon: Icon(Icons.money),
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Harga wajib diisi';
-                          }
-                          if (int.tryParse(value) == null) {
-                            return 'Harga harus angka';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _stockController,
-                        decoration: const InputDecoration(
-                          labelText: 'Stok',
-                          prefixIcon: Icon(Icons.inventory),
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Stok wajib diisi';
-                          }
-                          if (int.tryParse(value) == null) {
-                            return 'Stok harus angka';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextFormField(
-                  controller: _ratingController,
-                  decoration: const InputDecoration(
-                    labelText: 'Rating (1-5)',
-                    prefixIcon: Icon(Icons.star),
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value != null && value.trim().isNotEmpty) {
-                      final rating = double.tryParse(value);
-                      if (rating == null || rating < 0 || rating > 5) {
-                        return 'Rating harus antara 0-5';
-                      }
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextFormField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Deskripsi',
-                    prefixIcon: Icon(Icons.description),
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppBorderRadius.md,
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : Text(
-                            widget.isEdit ? 'Update' : 'Simpan',
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-              ],
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              widget.isEdit ? '✏️ Edit Material' : '➕ Tambah Material',
+              style: AppTextStyle.heading3,
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.lg),
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  if (!widget.isEdit) ...[
+                    InkWell(
+                      onTap: _pickImage,
+                      child: Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: AppColors.gray100,
+                          borderRadius: AppBorderRadius.md,
+                          border: Border.all(color: AppColors.gray300),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _selectedImage != null ? Icons.check_circle : Icons.add_photo_alternate,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                _selectedImage != null
+                                    ? 'Gambar dipilih: ${_selectedImage!.path.split('/').last}'
+                                    : 'Pilih gambar dari galeri (opsional)',
+                                style: AppTextStyle.bodyMedium,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nama Material',
+                      prefixIcon: Icon(Icons.label),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Nama material wajib diisi';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  DropdownButtonFormField<String>(
+                    value: _categoryController.text,
+                    decoration: const InputDecoration(
+                      labelText: 'Kategori',
+                      prefixIcon: Icon(Icons.category),
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _categoryOptions.map((category) {
+                      return DropdownMenuItem(
+                        value: category,
+                        child: Text(category),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _categoryController.text = value!;
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Kategori wajib dipilih';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _priceController,
+                          decoration: const InputDecoration(
+                            labelText: 'Harga',
+                            prefixIcon: Icon(Icons.money),
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Harga wajib diisi';
+                            }
+                            if (int.tryParse(value) == null) {
+                              return 'Harga harus angka';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _stockController,
+                          decoration: const InputDecoration(
+                            labelText: 'Stok',
+                            prefixIcon: Icon(Icons.inventory),
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Stok wajib diisi';
+                            }
+                            if (int.tryParse(value) == null) {
+                              return 'Stok harus angka';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    controller: _ratingController,
+                    decoration: const InputDecoration(
+                      labelText: 'Rating (1-5)',
+                      prefixIcon: Icon(Icons.star),
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value != null && value.trim().isNotEmpty) {
+                        final rating = double.tryParse(value);
+                        if (rating == null || rating < 0 || rating > 5) {
+                          return 'Rating harus antara 0-5';
+                        }
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    controller: _descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Deskripsi',
+                      prefixIcon: Icon(Icons.description),
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _save,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppBorderRadius.md,
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text(
+                              widget.isEdit ? 'Update' : 'Simpan',
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
