@@ -5,13 +5,14 @@ import 'pages/login_page.dart';
 import 'pages/home_page.dart';
 import 'pages/material_page.dart';
 import 'pages/profile_page.dart';
+import 'secrets/supabase_secret.dart';  // ← PERHATIKAN: 'secrets' (pakai s)
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await Supabase.initialize(
-    url: 'https://mfozrzbbcpmkrvqifdwv.supabase.co',
-    anonKey: 'sb_publishable_k4XBi7vnW7ArLIMZwpqUPw_nQCGEzZ2', // ← GANTI DENGAN INI
+    url: SupabaseSecret.supabaseUrl,
+    anonKey: SupabaseSecret.supabaseAnonKey,
   );
   
   runApp(const MyApp());
